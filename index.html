@@ -112,11 +112,13 @@ footer { max-width: 42rem; margin: 0 auto; padding: 0 1rem 2rem; font-family: sy
     <p class="note" id="missedIntro"></p>
     <div id="review"></div>
     <div id="sendBox" style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--line)">
-      <p class="note">Send only the items you missed for preceptorship review. The review copy includes your name and the misses. You will not see where it goes.</p>
+      <p class="note">Send from this page. It stays in the browser. It does not open the phone mail app.</p>
       <div class="row">
-        <button id="sendBtn" type="button">Send missed items for preceptorship review</button>
+        <button id="sendBtn" type="button">Send results from this page</button>
+        <button class="ghost" id="copyBtn" type="button">Copy summary</button>
       </div>
       <p class="note" id="sendStatus"></p>
+      <textarea id="summaryBox" readonly rows="8" style="width:100%;margin-top:.8rem;font-family:system-ui,sans-serif;font-size:.86rem;line-height:1.4;padding:.6rem .65rem;border:1px solid var(--line);background:var(--paper);color:var(--ink);"></textarea>
     </div>
   </section>
 </main>
@@ -214,6 +216,7 @@ $("beginBtn").addEventListener("click", () => {
   if (typeof saved.idx === "number") idx = saved.idx;
   if (saved.submitted) {
     lastGrade = grade();
+    fillSummaryBox();
     $("start").classList.add("hidden");
     $("quiz").classList.add("hidden");
     $("results").classList.remove("hidden");
@@ -233,42 +236,109 @@ $("nextBtn").addEventListener("click", () => {
     return;
   }
   lastGrade = grade();
+  fillSummaryBox();
   writeStore({ submitted: true });
   $("quiz").classList.add("hidden");
   $("results").classList.remove("hidden");
   window.scrollTo(0, 0);
 });
-$("sendBtn").addEventListener("click", async () => {
-  if (!lastGrade) return;
+function buildSummary(includeRationale) {
+  if (!lastGrade) return "";
   const name = $("studentName").value.trim() || "Unnamed student";
   const missed = lastGrade.missed;
-  const lines = ["Student: " + name, "Score: " + lastGrade.correct + " / " + ITEMS.length, "", missed.length ? "Missed items:" : "No items missed."];
+  const lines = [
+    "Student: " + name,
+    "Score: " + lastGrade.correct + " / " + ITEMS.length,
+    "",
+    missed.length ? "Missed items:" : "No items missed."
+  ];
   missed.forEach(({ item, chosen }) => {
     lines.push("");
     lines.push("Item " + item.n + " [" + item.topic + "]");
     lines.push(item.stem);
     lines.push("Chose: " + chosen + " \u2014 " + (item.choices[chosen] || ""));
     lines.push("Correct: " + item.answer + " \u2014 " + item.choices[item.answer]);
-    lines.push(item.rationale);
+    if (includeRationale) lines.push(item.rationale);
   });
-  $("sendStatus").textContent = "Sending review copy\u2026";
+  return lines.join("\n");
+}
+
+function fillSummaryBox() {
+  const text = buildSummary(false);
+  const box = $("summaryBox");
+  if (box) box.value = text;
+  return text;
+}
+
+async function copySummary() {
+  const text = fillSummaryBox();
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    try {
+      const box = $("summaryBox");
+      box.focus();
+      box.select();
+      document.execCommand("copy");
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
+
+$("copyBtn").addEventListener("click", async () => {
+  if (!lastGrade) return;
+  const ok = await copySummary();
+  $("sendStatus").textContent = ok
+    ? "Summary copied. Paste it wherever you send review notes."
+    : "Copy blocked. Select the text in the box and copy it.";
+});
+
+$("sendBtn").addEventListener("click", async () => {
+  if (!lastGrade) return;
+  const name = $("studentName").value.trim() || "Unnamed student";
+  const message = buildSummary(true);
+  fillSummaryBox();
+  $("sendStatus").textContent = "Sending from this page\u2026";
   $("sendBtn").disabled = true;
   try {
     const body = new FormData();
     body.append("_subject", "For Elisha to review and discuss with Yuriy");
     body.append("_template", "box");
     body.append("_captcha", "false");
+    body.append("_url", "https://ocdquiz.yuriybortnik.com");
     body.append("name", name);
     body.append("score", lastGrade.correct + " / " + ITEMS.length);
-    body.append("message", lines.join("\n"));
-    const res = await fetch("https://formsubmit.co/ajax/" + EMAIL_HOST, { method: "POST", headers: { Accept: "application/json" }, body });
-    if (!res.ok) throw new Error("send failed");
-    $("sendStatus").textContent = "Sent. Your preceptor will see the misses.";
+    body.append("message", message);
+    const res = await fetch("https://formsubmit.co/ajax/" + EMAIL_HOST, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body
+    });
+    const data = await res.json().catch(() => ({}));
+    const okFlag = data && String(data.success) === "true";
+    const msg = (data && data.message) ? String(data.message) : "";
+    if (okFlag) {
+      $("sendStatus").textContent = "Sent from this page. Your preceptor will see the misses.";
+      return;
+    }
+    if (/activat/i.test(msg)) {
+      await copySummary();
+      $("sendStatus").textContent = "Queued from this page. Summary is also copied below.";
+      $("sendBtn").disabled = false;
+      return;
+    }
+    throw new Error(msg || "send failed");
   } catch (err) {
-    $("sendStatus").textContent = "Could not send from this browser. Screenshot the missed items and bring them to precepting.";
+    await copySummary();
+    $("sendStatus").textContent = "Browser send did not go through. Summary is in the box. Copy it.";
     $("sendBtn").disabled = false;
   }
 });
+
+
 </script>
 </body>
 </html>
