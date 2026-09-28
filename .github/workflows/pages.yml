@@ -1,5 +1,5 @@
 name: Deploy Pages
-# ocdquiz hanging-shield inject 2026-09-04 morning
+# ocdquiz hanging-shield + readability inject 2026-09-28
 on:
   push:
     branches: [main]
@@ -19,8 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wire official hanging YB shield
-        run: python3 -c "from pathlib import Path; p=Path('index.html'); t=p.read_text(); s='<script src=\"yb-crest.js\"></script>\n'; p.write_text(t if 'yb-crest.js' in t else t.replace('</body>', s+'</body>', 1))"
+      - name: Wire quiz.css header and official crest
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('index.html')
+          t = p.read_text()
+          t = t.replace('<title>Preceptorship Exam</title>', '<title>OCD preceptorship exam</title>')
+          t = re.sub(r'<style>.*?</style>', '<link rel="stylesheet" href="quiz.css">', t, count=1, flags=re.S)
+          old = '''<header>\n  <div class="brand"><img src="yb-crest.svg" width="72" height="82" alt="YB"></div>\n  <p>Preceptorship exam. 25 items. Answers after you submit.</p>\n</header>'''
+          new = '''<header>\n  <div class="brand">\n    <img src="" width="50" height="56" alt="YB crest">\n    <p>Preceptorship exam. 25 items. Answers after you submit.</p>\n  </div>\n</header>'''
+          t = t.replace(old, new)
+          if 'yb-crest.js' not in t:
+              t = t.replace('</body>', '<script src="yb-crest.js"></script>\n</body>', 1)
+          p.write_text(t)
+          PY
       - uses: actions/configure-pages@v5
         with:
           enablement: true
