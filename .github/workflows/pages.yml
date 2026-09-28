@@ -1,5 +1,5 @@
 name: Deploy Pages
-# ocdquiz hanging-shield + readability inject 2026-09-28
+# ocdquiz hanging-shield + readability + favicon inject 2026-09-28
 on:
   push:
     branches: [main]
@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Wire official YB tab icon
+        run: python3 -c "from pathlib import Path; p=Path('index.html'); t=p.read_text(); s='<link rel=\"icon\" type=\"image/svg+xml\" href=\"https://yuriybortnik.com/favicon.svg\">\n<link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"https://yuriybortnik.com/favicon-32.png\">\n<link rel=\"apple-touch-icon\" href=\"https://yuriybortnik.com/apple-touch-icon.png\">\n'; p.write_text(t if 'yuriybortnik.com/favicon' in t else t.replace('<head>','<head>\n'+s,1))"
       - name: Wire quiz.css header and official crest
         run: |
           python3 - <<'PY'
