@@ -74,6 +74,7 @@ footer { max-width: 42rem; margin: 0 auto; padding: 0 1rem 2rem; font-family: sy
     <div class="row">
       <button class="ghost" id="prevBtn" type="button">Back</button>
       <button id="nextBtn" type="button">Next</button>
+      <button class="ghost" id="resetQuizBtn" type="button">Reset exam</button>
     </div>
   </section>
   <section id="results" class="card hidden">
@@ -221,12 +222,21 @@ function resetExam() {
   if (!confirm("Start over from question 1? This clears saved answers on this phone.")) return;
   try { localStorage.removeItem(STORE); } catch (e) {}
   document.cookie = STORE + "=;max-age=0;path=/;SameSite=Lax";
-  location.reload();
+  for (let i = 0; i < picks.length; i++) picks[i] = null;
+  idx = 0;
+  lastGrade = null;
+  $("beginBtn").textContent = "Start exam";
+  $("quiz").classList.add("hidden");
+  $("results").classList.add("hidden");
+  $("start").classList.remove("hidden");
+  window.scrollTo(0, 0);
 }
 const reset1 = $("resetBtn");
 const reset2 = $("resetBtn2");
+const reset3 = $("resetQuizBtn");
 if (reset1) reset1.addEventListener("click", resetExam);
 if (reset2) reset2.addEventListener("click", resetExam);
+if (reset3) reset3.addEventListener("click", resetExam);
 </script>
 </body>
 </html>
